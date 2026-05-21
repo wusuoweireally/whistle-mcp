@@ -242,7 +242,4 @@ Whistle MCP Server 提供了以下工具，可通过 MCP 协议调用：
 | ------- | --- | ---- |
 | getCurrentTimestamp | 获取当前时间戳 | 获取当前本地时间戳 |
 
-## 联系方式
-
-- 邮箱: [gz7gugu@qq.com](mailto:gz7gugu@qq.com)
 - 博客: [https://7gugu.com](https://7gugu.com)
