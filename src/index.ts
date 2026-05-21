@@ -480,7 +480,7 @@ server.addTool({
 server.addTool({
   name: "searchInterceptHistory",
   description:
-    "分页搜索 Whistle 历史请求，支持 URL/正则、时间、方法、客户端 IP、状态码过滤；默认脱敏敏感请求头",
+    "分页搜索 Whistle 历史请求，支持 URL/正则（不区分大小写，多关键词空格分隔全匹配）、时间、方法、客户端 IP、状态码过滤；默认脱敏敏感请求头。返回的每个 item 包含 req._decodedBody 和 res._decodedBody 可直接读取请求体和响应体内容", 
   parameters: z.object({
     url: z.string().optional().describe("URL 过滤条件，支持正则；正则无效时按字符串包含匹配"),
     startTime: z.string().optional().describe("开始游标/时间戳 ms，默认 0，可查询当前缓存内历史记录"),
@@ -537,7 +537,7 @@ server.addTool({
 server.addTool({
   name: "getSessionDetail",
   description:
-    "获取指定请求的完整详情，包含请求体（reqBody）和响应体（resBody）。body 为 base64 编码，需要解码后查看。搜索到请求后调用此接口即可查看完整内容",
+    "获取指定请求的完整详情，包含请求体（req._decodedBody）和响应体（res._decodedBody）。传入 searchInterceptHistory 返回的 sessionIds，即可查看该请求的完整请求和响应内容", 
   parameters: z.object({
     sessionIds: z.array(z.string()).describe("会话 ID 列表，从 searchInterceptHistory 返回的 sessionIds 中获取"),
   }),

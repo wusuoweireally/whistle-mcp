@@ -824,7 +824,21 @@ export class WhistleClient {
         ) {
           continue;
         }
-        items.push(options.redactSensitive === false ? item : redactInterceptItem(item));
+        const enhancedItem = options.redactSensitive === false ? { ...item } : redactInterceptItem({ ...item });
+        
+        // 自动解码请求体和响应体的 base64
+        if (enhancedItem.req?.base64) {
+          try {
+            enhancedItem.req._decodedBody = Buffer.from(enhancedItem.req.base64, "base64").toString("utf-8");
+          } catch {}
+        }
+        if (enhancedItem.res?.base64) {
+          try {
+            enhancedItem.res._decodedBody = Buffer.from(enhancedItem.res.base64, "base64").toString("utf-8");
+          } catch {}
+        }
+        
+        items.push(enhancedItem);
         if (item.id) {
           sessionIds.push(item.id);
         }
@@ -1000,25 +1014,94 @@ export class WhistleClient {
   }
 
   /**
-   * 获取单个请求的完整详情（包含请求体、响应体）
+   * 获取请求的完整详情（包含请求体、响应体）
+   * 先从 /cgi-bin/get-data 获取最近请求数据（含 body），
+   * 再尝试 /cgi-bin/get-session 获取更完整的会话信息。
    * @param sessionIds 会话 ID 列表
-   * @returns 完整请求响应数据，body 为 base64 编码
+   * @returns 完整请求响应数据
    */
   async getSessionDetail(sessionIds: string[]): Promise<any> {
     if (!sessionIds.length) {
       return {};
     }
-    const response = await this.http.get("/cgi-bin/get-session", {
+    
+    const result: Record<string, any> = {};
+    
+    // 1. 先从 get-data 获取最近的数据（含 body）
+    const timestamp = Date.now();
+    const dataResp = await this.http.get("/cgi-bin/get-data", {
       params: {
-        reqList: sessionIds.join(","),
-        resList: sessionIds.join(","),
+        clientId: `${timestamp}-0`,
+        startLogTime: -2,
+        startSvrLogTime: -2,
+        ids: "",
+        startTime: "0",
+        lastRowId: "0",
+        count: 100,
+        _: timestamp,
       },
       headers: {
         Accept: "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
       },
     });
-    return response.data;
+    
+    const allData = dataResp.data?.data?.data || {};
+    
+    // 2. 尝试 get-session 获取更完整数据
+    let sessionData: Record<string, any> = {};
+    try {
+      const sessionResp = await this.http.get("/cgi-bin/get-session", {
+        params: {
+          reqList: sessionIds.join(","),
+          resList: sessionIds.join(","),
+        },
+        headers: {
+          Accept: "application/json, text/javascript, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      sessionData = sessionResp.data || {};
+    } catch {}
+    
+    // 3. 合并数据
+    for (const sid of sessionIds) {
+      const item = allData[sid];
+      const sessionItem = sessionData[sid];
+      
+      if (!item && !sessionItem) {
+        result[sid] = { error: "session not found" };
+        continue;
+      }
+      
+      const merged: any = { ...item, ...sessionItem };
+      
+      // 从 get-data 获取 body
+      if (item) {
+        const reqBase64 = item.req?.base64;
+        const resBase64 = item.res?.base64;
+        
+        if (reqBase64) {
+          merged.req = { ...merged.req };
+          merged.req.body = merged.req.body || "";
+          merged.req.base64 = reqBase64;
+          try {
+            merged.req._decodedBody = Buffer.from(reqBase64, "base64").toString("utf-8");
+          } catch {}
+        }
+        if (resBase64) {
+          merged.res = { ...merged.res };
+          merged.res.base64 = resBase64;
+          try {
+            merged.res._decodedBody = Buffer.from(resBase64, "base64").toString("utf-8");
+          } catch {}
+        }
+      }
+      
+      result[sid] = merged;
+    }
+    
+    return result;
   }
 
   /**
