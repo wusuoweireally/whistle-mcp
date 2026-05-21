@@ -533,6 +533,53 @@ server.addTool({
   },
 });
 
+// 新增：获取会话详情（含请求体、响应体）
+server.addTool({
+  name: "getSessionDetail",
+  description:
+    "获取指定请求的完整详情，包含请求体（reqBody）和响应体（resBody）。body 为 base64 编码，需要解码后查看。搜索到请求后调用此接口即可查看完整内容",
+  parameters: z.object({
+    sessionIds: z.array(z.string()).describe("会话 ID 列表，从 searchInterceptHistory 返回的 sessionIds 中获取"),
+  }),
+  execute: async (args) => {
+    const result = await whistleClient.getSessionDetail(args.sessionIds);
+    return formatResponse(result);
+  },
+});
+
+// 新增：创建 Mock 规则
+server.addTool({
+  name: "createMock",
+  description:
+    "创建 Mock 规则：匹配指定 URL 的请求，返回自定义的响应内容。会在 Whistle 中创建一条规则和一个对应的值",
+  parameters: z.object({
+    ruleName: z.string().describe("规则名称，例如 'mock_user_api'"),
+    urlPattern: z.string().describe("URL 匹配模式，例如 'example.com/api/user' 或正则 '/api/user\\d+' 等"),
+    statusCode: z.number().optional().describe("响应状态码，例如 200、404、500。不传则保持原状"),
+    responseBody: z.string().describe("mock 的响应体内容，JSON 字符串、HTML 等"),
+    responseHeaders: z.record(z.string(), z.string()).optional().describe("自定义响应头，例如 { 'Content-Type': 'application/json' }"),
+    delay: z.number().optional().describe("延迟响应时间（毫秒）"),
+    method: z.string().optional().describe("仅匹配特定请求方法，如 GET、POST"),
+  }),
+  execute: async (args) => {
+    const result = await whistleClient.createMock(args);
+    return formatResponse(result);
+  },
+});
+
+// 新增：删除 Mock 规则
+server.addTool({
+  name: "deleteMock",
+  description: "删除指定的 Mock 规则及其关联的值",
+  parameters: z.object({
+    ruleName: z.string().describe("要删除的 Mock 规则名称"),
+  }),
+  execute: async (args) => {
+    const result = await whistleClient.deleteMock(args.ruleName);
+    return formatResponse(result);
+  },
+});
+
 /**
  * 返回当前本地的时间戳
  */

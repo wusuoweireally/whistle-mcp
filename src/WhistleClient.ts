@@ -28,11 +28,15 @@ function matchesUrl(itemUrl: string, pattern?: string): boolean {
   if (!pattern) {
     return true;
   }
+  // 先尝试正则匹配（不区分大小写）
   try {
-    return new RegExp(pattern).test(itemUrl);
-  } catch {
-    return itemUrl.includes(pattern);
-  }
+    return new RegExp(pattern, 'i').test(itemUrl);
+  } catch {}
+
+  // 多关键词：空格分隔，全部匹配即算命中（不区分大小写）
+  const keywords = pattern.trim().split(/\s+/);
+  const lowerUrl = itemUrl.toLowerCase();
+  return keywords.every(kw => lowerUrl.includes(kw.toLowerCase()));
 }
 
 function redactHeaders(headers: Record<string, any> | undefined) {
@@ -754,6 +758,7 @@ export class WhistleClient {
     let hasMore = false;
     let pagesRead = 0;
     const items: any[] = [];
+    const sessionIds: string[] = [];
 
     for (; pagesRead < maxPages && items.length < limit; pagesRead += 1) {
       const timestamp = Date.now();
@@ -820,6 +825,9 @@ export class WhistleClient {
           continue;
         }
         items.push(options.redactSensitive === false ? item : redactInterceptItem(item));
+        if (item.id) {
+          sessionIds.push(item.id);
+        }
         if (items.length >= limit) {
           break;
         }
@@ -835,6 +843,7 @@ export class WhistleClient {
       hasMore,
       nextLastRowId: cursor,
       items,
+      sessionIds,
     };
   }
 
@@ -988,5 +997,144 @@ export class WhistleClient {
       }
     );
     return response.data;
+  }
+
+  /**
+   * 获取单个请求的完整详情（包含请求体、响应体）
+   * @param sessionIds 会话 ID 列表
+   * @returns 完整请求响应数据，body 为 base64 编码
+   */
+  async getSessionDetail(sessionIds: string[]): Promise<any> {
+    if (!sessionIds.length) {
+      return {};
+    }
+    const response = await this.http.get("/cgi-bin/get-session", {
+      params: {
+        reqList: sessionIds.join(","),
+        resList: sessionIds.join(","),
+      },
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    return response.data;
+  }
+
+  /**
+   * 创建 Mock 规则：在 Whistle 中创建一个规则，匹配指定 URL 并返回自定义响应
+   * @param options 配置
+   * @returns 创建结果
+   */
+  async createMock(options: {
+    ruleName: string;
+    urlPattern: string;
+    statusCode?: number;
+    responseBody: string;
+    responseHeaders?: Record<string, string>;
+    delay?: number;
+    method?: string;
+  }): Promise<any> {
+    const { ruleName, urlPattern, statusCode, responseBody, responseHeaders, delay, method } = options;
+
+    // 1. 创建一个 value 存储 mock 响应体
+    const valueName = `mock_${ruleName}_body`;
+    await this.createValue(valueName);
+    await this.updateValue(valueName, responseBody);
+
+    // 2. 构建规则内容
+    const parts: string[] = [];
+    
+    // URL 模式 + 可选方法过滤
+    let pattern = urlPattern;
+    if (method) {
+      pattern = `method://${method.toUpperCase()} ${pattern}`;
+    }
+    
+    // 响应头（存入另一个 value）
+    if (responseHeaders && Object.keys(responseHeaders).length > 0) {
+      const headerValueName = `mock_${ruleName}_headers`;
+      await this.createValue(headerValueName);
+      await this.updateValue(headerValueName, JSON.stringify(responseHeaders, null, 2));
+      parts.push(`resHeaders://{${headerValueName}}`);
+    }
+
+    // 状态码
+    if (statusCode) {
+      parts.push(`statusCode://${statusCode}`);
+    }
+
+    // 延迟
+    if (delay) {
+      parts.push(`resDelay://${delay}`);
+    }
+
+    // 响应体
+    parts.push(`resBody://{${valueName}}`);
+
+    const ruleValue = `${pattern} ${parts.join(" ")}`;
+
+    // 3. 创建规则
+    await this.createRule(ruleName);
+    await this.updateRule(ruleName, ruleValue);
+
+    return {
+      ruleName,
+      ruleValue,
+      createdValues: [
+        { name: valueName, description: "mock response body" },
+        ...(responseHeaders ? [{ name: `mock_${ruleName}_headers`, description: "mock response headers" }] : []),
+      ],
+    };
+  }
+
+  /**
+   * 删除 Mock 规则及相关值
+   * @param ruleName 规则名称
+   */
+  async deleteMock(ruleName: string): Promise<any> {
+    const deleted: string[] = [];
+
+    // 删除规则
+    try {
+      await this.deleteRule(ruleName);
+      deleted.push(`rule: ${ruleName}`);
+    } catch (e: any) {
+      // 规则可能不存在，忽略
+    }
+
+    // 删除关联的 value
+    for (const suffix of ["_body", "_headers"]) {
+      const valueName = `mock_${ruleName}${suffix}`;
+      try {
+        await this.deleteValue(valueName);
+        deleted.push(`value: ${valueName}`);
+      } catch (e: any) {
+        // value 可能不存在，忽略
+      }
+    }
+
+    return { deleted };
+  }
+
+  /**
+   * 健康检查
+   */
+  async healthCheck(): Promise<any> {
+    try {
+      const startTime = Date.now();
+      await this.http.get("/cgi-bin/status");
+      return {
+        status: "ok",
+        latency: Date.now() - startTime,
+        host: this.baseUrl,
+      };
+    } catch (e: any) {
+      return {
+        status: "error",
+        message: e.message || "Connection failed",
+        host: this.baseUrl,
+      };
+    }
   }
 }
