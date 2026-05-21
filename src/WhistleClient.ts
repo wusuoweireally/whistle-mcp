@@ -1122,7 +1122,6 @@ export class WhistleClient {
 
     // 1. 创建一个 value 存储 mock 响应体
     const valueName = `mock_${ruleName}_body`;
-    await this.createValue(valueName);
     await this.updateValue(valueName, responseBody);
 
     // 2. 构建规则内容
@@ -1137,7 +1136,6 @@ export class WhistleClient {
     // 响应头（存入另一个 value）
     if (responseHeaders && Object.keys(responseHeaders).length > 0) {
       const headerValueName = `mock_${ruleName}_headers`;
-      await this.createValue(headerValueName);
       await this.updateValue(headerValueName, JSON.stringify(responseHeaders, null, 2));
       parts.push(`resHeaders://{${headerValueName}}`);
     }

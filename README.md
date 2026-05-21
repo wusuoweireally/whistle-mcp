@@ -23,13 +23,7 @@ Whistle MCP Server 是一个基于 Model Context Protocol (MCP) 协议的 Whistl
 
 必须使用 **Node.js 18.20.0** 及以上版本（与 `package.json` 中 `engines` 字段一致），低于该版本不予支持。
 
-您可以通过 npm 全局安装 Whistle MCP Server：
-
-```bash
-npm install -g whistle-mcp-tool
-```
-
-本 fork 的增强版本发布为 scoped 包：
+### 全局安装
 
 ```bash
 npm install -g @tzt520/whistle-mcp-tool
@@ -242,4 +236,4 @@ Whistle MCP Server 提供了以下工具，可通过 MCP 协议调用：
 | ------- | --- | ---- |
 | getCurrentTimestamp | 获取当前时间戳 | 获取当前本地时间戳 |
 
-- 博客: [https://7gugu.com](https://7gugu.com)
+
