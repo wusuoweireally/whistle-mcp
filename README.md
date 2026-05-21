@@ -1,0 +1,257 @@
+# Whistle MCP Server
+
+English | [中文](README_CN.md)
+
+## Project Introduction
+
+Whistle MCP Server is a Whistle proxy management tool based on the Model Context Protocol (MCP), allowing AI assistants to directly operate and control local Whistle proxy servers. Through this tool, AI can help users manage rules, groups, values, monitor network requests, replay and modify requests, etc., without requiring manual operation of the Whistle interface. It greatly simplifies the process of network debugging, API testing, and proxy rule management, enabling users to complete complex network proxy configuration tasks through natural language interaction with AI.
+
+## Features
+
+- **Rule Management**: Create, update, rename, delete, and enable/disable Whistle rules
+- **Group Management**: Create, rename, delete groups, and associate operations between rules and groups
+- **Value Management**: Create, update, rename, and delete values, with support for value group management
+- **Proxy Control**: Enable/disable proxy, HTTP/HTTPS interception, HTTP/2 protocol, etc.
+- **Request Interception**: View intercepted network request information, with URL filtering support
+- **Historical Request Search**: Page through Whistle request history with URL/regex, time, method, client IP, and status-code filters
+- **Request Replay**: Support for replaying captured requests with custom request parameters
+- **Multi-Rule Mode**: Support for enabling/disabling multi-rule mode
+
+## Installation
+
+### Requirements
+
+**Node.js 18.20.0 or newer is required** (see `engines` in `package.json`). Older versions are not supported.
+
+### Installing via Smithery
+
+To install Whistle MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@7gugu/whistle-mcp):
+
+```bash
+npx -y @smithery/cli install @7gugu/whistle-mcp --client claude
+```
+
+### Manual Installation
+You can install Whistle MCP Server globally via npm:
+
+```bash
+npm install -g whistle-mcp-tool
+```
+
+This fork with historical request search is published as a scoped package:
+
+```bash
+npm install -g @tzt520/whistle-mcp-tool
+```
+
+### Build from source
+
+From the repository root:
+
+```bash
+npm install
+npm run build
+```
+
+The build output entry is **`dist/index.js`** (the same file used by the `whistle-mcp` CLI after a global install). You can also point MCP config at it with `node` and the path to `dist/index.js`.
+
+## MCP Configuration
+
+### Transport (stdio vs HTTP)
+
+By default the server uses **`stdio`** (suitable for local MCP clients such as Cursor).
+
+To expose **Streamable HTTP** and **SSE** on the same process (for remote or HTTP-capable clients), use **`--transport http-stream`**. FastMCP then listens on **`--mcp-host`** / **`--mcp-port`** and serves:
+
+- Streamable HTTP: `http://<mcp-host>:<mcp-port><mcp-endpoint>` (default path **`/mcp`**)
+- SSE: `http://<mcp-host>:<mcp-port>/sse`
+
+Aliases for `http-stream`: `sse`, `streamable-http` (same mode; both URLs are available).
+
+| Flag / env | Meaning |
+|------------|---------|
+| `--transport` / `-t`, `FASTMCP_TRANSPORT` | `stdio` (default) or `http-stream` |
+| `--mcp-port`, `FASTMCP_PORT` | MCP HTTP port (default **8085** when using HTTP transport) |
+| `--mcp-host`, `FASTMCP_HOST` | Bind address (default **0.0.0.0**) |
+| `--mcp-endpoint`, `FASTMCP_ENDPOINT` | Streamable HTTP path (default **`/mcp`**) |
+| `--stateless`, `FASTMCP_STATELESS=true` | Stateless HTTP mode (optional) |
+
+**Whistle** connection options are unchanged: **`--host`**, **`--port`**, **`--username` / `--password`** (or `-n` / `-w`).
+
+Example (HTTP transport + local Whistle on 8899; MCP listens on **8085** by default):
+
+```bash
+whistle-mcp --transport http-stream --host 127.0.0.1 --port 8899
+```
+
+Use `--mcp-port <port>` to override the default **8085**.
+
+After installation, you can configure Whistle MCP in your MCP JSON configuration file:
+
+```json
+{
+  "mcpServers": {
+    "whistle-mcp": {
+      "command": "whistle-mcp",
+      "args": [
+        "--host=<whistle server IP address>",
+        "--port=<whistle server port number>"
+      ]
+    }
+  }
+}
+```
+
+If you start Whistle with basic auth (same flags as the Whistle CLI: `w2 start -n <username> -w <password>`), pass the **same** credentials to this MCP server so HTTP requests to Whistle’s API succeed:
+
+```json
+{
+  "mcpServers": {
+    "whistle-mcp": {
+      "command": "whistle-mcp",
+      "args": [
+        "--host=localhost",
+        "--port=8899",
+        "--username=<username>",
+        "--password=<password>"
+      ]
+    }
+  }
+}
+```
+
+Short options (aligned with `w2`): `-n` / `-w` are equivalent to `--username` / `--password`.
+
+```bash
+whistle-mcp --host localhost --port 8899 -n myuser -w mypass
+```
+
+### Configuration Details
+
+- **host**: Whistle server IP address; defaults to `localhost` if omitted
+- **port**: Whistle server port; defaults to `8899` if omitted
+- **username** (`-n` / `--username`): Basic auth username when Whistle was started with `-n`; omit if Whistle has no login
+- **password** (`-w` / `--password`): Basic auth password when Whistle was started with `-w`; if username is set but password is omitted, an empty password is sent
+
+## Configuring MCP JSON in AI Clients
+
+- Claude Client: [https://modelcontextprotocol.io/quickstart/user](https://modelcontextprotocol.io/quickstart/user)
+- Raycast: Requires MCP plugin installation
+- Cursor: [https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers)
+
+## MCP Tools Description
+
+Whistle MCP Server provides the following tools, which can be called via the MCP protocol:
+
+### Rule Management
+
+| Tool Name | Description | Function |
+| ------- | --- | ---- |
+| getRules | Get all rules | List all created rules and their content |
+| createRule | Create new rule | Create a new rule with the specified name |
+| updateRule | Update rule content | Modify the content of a specified rule |
+| renameRule | Rename rule | Rename a rule to a new name |
+| deleteRule | Delete rule | Delete a rule with the specified name |
+| enableRule | Enable rule | Enable a rule with the specified name |
+| disableRule | Disable rule | Disable a rule with the specified name |
+| setAllRulesState | Set all rules state | Enable or disable all rules at once |
+
+### Group Management
+
+| Tool Name | Description | Function |
+| ------- | --- | ---- |
+| createGroup | Create group | Create a new rule group with the specified name |
+| renameGroup | Rename group | Rename a rule group to a new name |
+| deleteGroup | Delete group | Delete a rule group with the specified name |
+| addRuleToGroup | Add rule to group | Add a specified rule to a specific group |
+| removeRuleFromGroup | Remove rule from group | Remove a rule from its group to the top level |
+
+### Value Management
+
+| Tool Name | Description | Function |
+| ------- | --- | ---- |
+| getAllValues | Get all values | List all created values and value groups (note: data may be large, consider using getValueList first) |
+| getValueList | Get value list | Get value list with index and name only (without data field, to avoid large payloads) |
+| getValue | Get single value | Get full information of a single value by name (including data field) |
+| createValue | Create new value | Create a new value with the specified name |
+| updateValue | Update value content | Modify the content of a specified value |
+| renameValue | Rename value | Rename a value to a new name |
+| deleteValue | Delete value | Delete a value with the specified name |
+| createValuesGroup | Create value group | Create a new value group with the specified name |
+| renameValueGroup | Rename value group | Rename a value group to a new name |
+| deleteValueGroup | Delete value group | Delete a value group with the specified name |
+| addValueToGroup | Add value to group | Add a specified value to a specific group |
+| removeValueFromGroup | Remove value from group | Remove a value from its group to the top level |
+
+### Proxy Control
+
+| Tool Name | Description | Function |
+| ------- | --- | ---- |
+| getWhistleStatus | Get server status | Get the current status information of the Whistle server |
+| toggleProxy | Enable/disable proxy | Toggle the enabled state of the Whistle proxy |
+| toggleHttpInterception | Enable/disable HTTP interception | Toggle the enabled state of HTTP request interception |
+| toggleHttpsInterception | Enable/disable HTTPS interception | Toggle the enabled state of HTTPS request interception |
+| toggleHttp2 | Enable/disable HTTP2 | Toggle the enabled state of HTTP/2 protocol support |
+| toggleMultiRuleMode | Enable/disable multi-rule mode | Toggle whether to allow multiple rules to be enabled simultaneously |
+
+### Request Management
+
+| Tool Name | Description | Function |
+| ------- | --- | ---- |
+| getInterceptInfo | Get interception information | Get network request information intercepted by Whistle, with URL filtering and regex support |
+| searchInterceptHistory | Search historical requests | Page through Whistle request history with URL/regex, time, method, client IP, and status-code filters. Sensitive headers are redacted by default |
+| replayRequest | Replay request | Resend a specified network request with customizable parameters |
+
+#### `searchInterceptHistory`
+
+`getInterceptInfo` is best for querying newly captured requests immediately after invocation. Use `searchInterceptHistory` when you need to search requests that already exist in Whistle's in-memory history. It pages through Whistle's `/cgi-bin/get-data` API and advances the cursor using the returned `lastId`.
+
+Common parameters:
+
+| Parameter | Description |
+| ---- | ---- |
+| `url` | URL filter. Supports regex; falls back to substring matching when the regex is invalid |
+| `startTime` | Start timestamp/cursor in milliseconds. Defaults to `0`, which searches from the beginning of the current Whistle cache |
+| `endTime` | Optional end timestamp in milliseconds |
+| `count` | Maximum matched requests to return. Defaults to `100`, max `1000` |
+| `pageSize` | Requests read per page. Defaults to `100`, max `100` |
+| `maxPages` | Maximum pages to scan. Defaults to `20`, max `200` |
+| `method` | Request method filter, such as `GET` or `POST` |
+| `clientIp` | Client IP filter, useful for separating phone traffic from local simulator traffic |
+| `statusCode` | Response status-code filter |
+| `redactSensitive` | Redact `authorization`, `cookie`, `token`, and related headers. Defaults to `true` |
+
+Example:
+
+```json
+{
+  "url": "queryLessonDetail",
+  "clientIp": "10.25.144.26",
+  "method": "POST",
+  "count": 20
+}
+```
+
+Response shape:
+
+```json
+{
+  "count": 1,
+  "pageSize": 100,
+  "pagesRead": 5,
+  "hasMore": false,
+  "nextLastRowId": "1779334057620-211",
+  "items": []
+}
+```
+
+### Utility
+
+| Tool Name | Description | Function |
+| ------- | --- | ---- |
+| getCurrentTimestamp | Get current timestamp | Get the current local timestamp |
+
+## Contact Information
+
+- Email: [gz7gugu@qq.com](mailto:gz7gugu@qq.com)
+- Blog: [https://7gugu.com](https://7gugu.com)

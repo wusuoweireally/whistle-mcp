@@ -1,0 +1,49 @@
+{
+  "name": "@tzt520/whistle-mcp-tool",
+  "version": "1.2.1",
+  "description": "Whistle MCP Server is a Whistle proxy management tool based on the Model Context Protocol (MCP), allowing AI assistants to directly operate and control local Whistle proxy servers. Through this tool, AI can help users manage rules, groups, values, monitor network requests, replay and modify requests, etc., without requiring manual operation of the Whistle interface. It greatly simplifies the process of network debugging, API testing, and proxy rule management, enabling users to complete complex network proxy configuration tasks through natural language interaction with AI.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "whistle-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "dev": "npx fastmcp inspect src/index.ts",
+    "build": "tsc && node scripts/add-shebang.js && chmod +x dist/index.js"
+  },
+  "engines": {
+    "node": ">=18.20.0"
+  },
+  "dependencies": {
+    "axios": "1.14.0",
+    "fastmcp": "^3.25.4",
+    "minimist": "^1.2.8"
+  },
+  "devDependencies": {
+    "@types/minimist": "^1.2.5",
+    "@types/node": "^22.13.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wusuoweireally/whistle-mcp.git"
+  },
+  "keywords": [
+    "whistle",
+    "proxy",
+    "MCP"
+  ],
+  "author": "7gugu",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wusuoweireally/whistle-mcp/issues"
+  },
+  "homepage": "https://github.com/wusuoweireally/whistle-mcp#readme"
+}
