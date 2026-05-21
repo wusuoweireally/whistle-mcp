@@ -695,9 +695,19 @@ export class WhistleClient {
    * @returns 
    */
   async toggleProxy(enabled: boolean): Promise<any> {
-    const response = await this.http.post("/cgi-bin/proxy/enable", {
-      enabled,
-    });
+    // Whistle 没有独立的代理开关，通过禁用所有规则实现"直通模式"
+    const formData = new URLSearchParams();
+    formData.append("clientId", `${Date.now()}-1`);
+    formData.append("disabledAllRules", enabled ? "0" : "1");
+    const response = await this.http.post(
+      "/cgi-bin/rules/disable-all-rules",
+      formData,
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
     return response.data;
   }
 
@@ -867,27 +877,15 @@ export class WhistleClient {
    * @returns 重放请求的结果
    */
   async replayRequest(options: {
-    useH2?: boolean; // 是否使用HTTP/2
-    url: string; // 请求URL
-    method?: string; // 请求方法，默认GET
-    headers?: Record<string, string> | string; // 请求头，可以是对象或字符串
-    body?: string | Record<string, any>; // 请求体
+    useH2?: boolean;
+    url: string;
+    method?: string;
+    headers?: Record<string, string> | string;
+    body?: string | Record<string, any>;
   }): Promise<any> {
-    // 准备请求参数
-    const formData = new URLSearchParams();
-
-    // 是否使用HTTP/2
-    formData.append("useH2", options.useH2 ? "true" : "");
-
-    // 添加URL (必需)
-    formData.append("url", options.url);
-
-    // 添加请求方法
-    formData.append("method", options.method || "GET");
-
     // 处理请求头
+    let headerStr = "";
     if (options.headers) {
-      let headerStr = "";
       if (typeof options.headers === "string") {
         headerStr = options.headers;
       } else {
@@ -895,30 +893,29 @@ export class WhistleClient {
           .map(([key, value]) => `${key}: ${value}`)
           .join("\r\n");
       }
-      formData.append("headers", headerStr);
     }
 
     // 处理请求体
+    let bodyStr = "";
     if (options.body) {
-      if (typeof options.body === "string") {
-        formData.append("body", options.body);
-      } else {
-        // 对象类型的请求体转为JSON字符串
-        formData.append("body", JSON.stringify(options.body));
-      }
+      bodyStr = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
     }
 
-    // 发送重放请求到composer接口
+    // Composer 要求 JSON 格式（不是 form-urlencoded）
+    const jsonBody: Record<string, any> = {
+      url: options.url,
+      method: options.method || "GET",
+      useH2: options.useH2 || false,
+    };
+    if (headerStr) jsonBody.headers = headerStr;
+    if (bodyStr) jsonBody.body = bodyStr;
+
     const response = await this.http.post(
       "/cgi-bin/composer",
-      formData,
+      jsonBody,
       {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "X-Requested-With": "XMLHttpRequest",
-          Accept: "application/json, text/javascript, */*; q=0.01",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
+          "Content-Type": "application/json",
         },
       }
     );

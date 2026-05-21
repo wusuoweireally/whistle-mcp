@@ -387,24 +387,12 @@ server.addTool({
 
 server.addTool({
   name: "toggleProxy",
-  description: "启用或禁用whistle代理",
+  description: "启用或禁用 Whistle 代理（通过禁用/启用所有规则实现。启用=规则生效，禁用=直通模式，不修改任何请求）",
   parameters: z.object({
-    enabled: z.boolean().describe("是否启用代理"),
+    enabled: z.boolean().describe("true=代理生效，false=直通模式（禁用所有规则）"),
   }),
   execute: async (args) => {
     const result = await whistleClient.toggleProxy(args.enabled);
-    return formatResponse(result);
-  },
-});
-
-server.addTool({
-  name: "toggleHttpInterception",
-  description: "启用或禁用HTTP拦截",
-  parameters: z.object({
-    enabled: z.boolean().describe("是否启用HTTP拦截"),
-  }),
-  execute: async (args) => {
-    const result = await whistleClient.toggleHttpsInterception(args.enabled);
     return formatResponse(result);
   },
 });
