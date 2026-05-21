@@ -101,8 +101,18 @@ export class WhistleClient {
    * @returns
    */
   async getRules(): Promise<any> {
-    const response = await this.http.get("/cgi-bin/rules/list");
-    return response.data;
+    const timestamp = Date.now();
+    const response = await this.http.get("/cgi-bin/init", {
+      params: { _: timestamp },
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    const { rules } = response.data;
+    return rules;
   }
 
   /**
